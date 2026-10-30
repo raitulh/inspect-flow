@@ -1,0 +1,128 @@
+name: lineguard-cv
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lineguard}
+      POSTGRES_USER: ${POSTGRES_USER:-lineguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-only-change-me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lineguard} -d ${POSTGRES_DB:-lineguard}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks: [internal]
+
+  api:
+    build:
+      context: ./backend
+      args:
+        INSTALL_EXTRAS: ${BACKEND_EXTRAS:-}
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      SECRET_KEY: ${SECRET_KEY:-local-development-only-change-before-deployment}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lineguard}:${POSTGRES_PASSWORD:-local-only-change-me}@db:5432/${POSTGRES_DB:-lineguard}
+      STORAGE_ROOT: /app/data
+      CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000"]'
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-200}
+      YOLO_MODEL_PATH: ${YOLO_MODEL_PATH:-}
+      YOLO_MODEL_ROOT: /app/data/models
+      AUTO_CREATE_TABLES: "false"
+    volumes:
+      - lineguard_data:/app/data
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks: [internal]
+
+  worker:
+    build:
+      context: ./backend
+      args:
+        INSTALL_EXTRAS: ${BACKEND_EXTRAS:-}
+    command: ["python", "-m", "app.cli", "worker"]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      SECRET_KEY: ${SECRET_KEY:-local-development-only-change-before-deployment}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lineguard}:${POSTGRES_PASSWORD:-local-only-change-me}@db:5432/${POSTGRES_DB:-lineguard}
+      STORAGE_ROOT: /app/data
+      WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-1}
+      DEFAULT_FRAME_STRIDE: ${DEFAULT_FRAME_STRIDE:-10}
+      MAX_SAMPLED_FRAMES: ${MAX_SAMPLED_FRAMES:-1200}
+      YOLO_MODEL_PATH: ${YOLO_MODEL_PATH:-}
+      YOLO_MODEL_ROOT: /app/data/models
+    volumes:
+      - lineguard_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [internal]
+
+  camera-worker:
+    build:
+      context: ./backend
+      args:
+        INSTALL_EXTRAS: ${BACKEND_EXTRAS:-}
+    command: ["python", "-m", "app.cli", "camera-worker"]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      SECRET_KEY: ${SECRET_KEY:-local-development-only-change-before-deployment}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lineguard}:${POSTGRES_PASSWORD:-local-only-change-me}@db:5432/${POSTGRES_DB:-lineguard}
+      STORAGE_ROOT: /app/data
+      LIVE_CAMERA_SAMPLE_SECONDS: ${LIVE_CAMERA_SAMPLE_SECONDS:-1.0}
+      LIVE_EVENT_DEDUPE_SECONDS: ${LIVE_EVENT_DEDUPE_SECONDS:-60}
+      YOLO_MODEL_PATH: ${YOLO_MODEL_PATH:-}
+      YOLO_MODEL_ROOT: /app/data/models
+      PLC_UNIT_ID: ${PLC_UNIT_ID:-1}
+      PLC_STOP_REQUEST_COIL: ${PLC_STOP_REQUEST_COIL:-0}
+      PLC_MODE: ${PLC_MODE:-simulation}
+      PLC_HOST: ${PLC_HOST:-}
+      PLC_PORT: ${PLC_PORT:-502}
+      PLC_OUTPUTS_ENABLED: ${PLC_OUTPUTS_ENABLED:-false}
+    volumes:
+      - lineguard_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [internal]
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    environment:
+      NODE_ENV: production
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [internal]
+
+volumes:
+  postgres_data:
+  lineguard_data:
+
+networks:
+  internal:
+    driver: bridge

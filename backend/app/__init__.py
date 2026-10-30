@@ -1,0 +1,1 @@
+"""LineGuard CV backend application."""

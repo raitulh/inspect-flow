@@ -1,0 +1,32 @@
+services:
+  db:
+    ports: !reset []
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong POSTGRES_PASSWORD}
+    security_opt:
+      - no-new-privileges:true
+
+  api:
+    ports: !reset []
+    environment:
+      APP_ENV: production
+      SECRET_KEY: ${SECRET_KEY:?Set a strong SECRET_KEY of at least 32 characters}
+      COOKIE_SECURE: "true"
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set the exact frontend origin as a JSON array}
+    security_opt:
+      - no-new-privileges:true
+
+  worker:
+    security_opt:
+      - no-new-privileges:true
+
+  camera-worker:
+    environment:
+      PLC_OUTPUTS_ENABLED: "false"
+    security_opt:
+      - no-new-privileges:true
+
+  web:
+    ports: !reset []
+    security_opt:
+      - no-new-privileges:true

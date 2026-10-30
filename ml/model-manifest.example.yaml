@@ -1,0 +1,26 @@
+# This manifest describes the included baseline. It is not a pretrained detector artifact.
+name: opencv_rules
+version: opencv-color-and-motion-rules-v1
+provider_type: deterministic_opencv_heuristics
+artifact_path: null
+artifact_sha256: null
+trained_weights: false
+classes: []
+input:
+  formats: [video]
+  color_space: BGR decoded by OpenCV
+  sampling:
+    frame_stride_env: DEFAULT_FRAME_STRIDE
+    max_sampled_frames_env: MAX_SAMPLED_FRAMES
+output:
+  event_types:
+    - potential_missing_component
+    - possible_station_stall
+  confidence: null
+licensing:
+  application_license: MIT
+  dependencies: review dependency licenses in the installed distribution
+limitations:
+  - color_presence checks configured HSV pixels; it is not semantic object recognition
+  - motion_stall is a frame-difference heuristic and not authoritative machine telemetry
+  - no industrial accuracy or safety certification is claimed

@@ -1,0 +1,10 @@
+# Copy to a real dataset root data.yaml and adapt paths/class names.
+path: /absolute/path/to/lineguard-dataset
+train: images/train
+val: images/val
+# test: images/test
+names:
+  0: scratch
+  1: crack
+  2: missing_component
+  3: wrong_component
